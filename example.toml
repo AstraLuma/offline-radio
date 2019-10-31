@@ -1,0 +1,12 @@
+[quota]
+size="X"
+age="Y"
+
+[[sub]]
+yt_id="deadbeefbabe"
+
+[[sub]]
+yt_name="spam-n-eggs"
+
+[[sub]]
+feed="http://example.com/feed.xml"
