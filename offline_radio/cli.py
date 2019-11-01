@@ -55,7 +55,10 @@ class SeenList:
     def __enter__(self):
         try:
             with open('.offline-radio.state', 'rt') as f:
-                self._urls = set(f)
+                self._urls = {
+                    l.strip()
+                    for l in f
+                }
         except FileNotFoundError:
             self._urls = set()
 
@@ -63,9 +66,14 @@ class SeenList:
 
         return self
 
-    def __exit__(self, *_):
+    def __exit__(self, type, value, traceback):
+        # On error exit, don't prune
+        if value:
+            seq = self._urls + self._seen
+        else:
+            seq = self._seen
         with open('.offline-radio.state', 'wt') as f:
-            for u in self._seen:
+            for u in seq:
                 print(u, file=f)
 
     def has_seen(self, url):
