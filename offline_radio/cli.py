@@ -34,7 +34,7 @@ def pathtime(p):
     ))
 
 
-def iter_media():
+def iter_media_dir():
     for f in Path().iterdir():
         if f.name.startswith('.'):
             continue
@@ -67,7 +67,7 @@ class SeenList:
 
         # Attempt to load from xattrs
         # We can't rely on this, but there's gaps in the other algorithms
-        for p in iter_media():
+        for p in iter_media_dir():
             try:
                 u = xattr.getxattr(str(p), "user.xdg.referrer.url").decode('utf-8')
             except OSError:
@@ -105,7 +105,7 @@ def remove_old(maxage):
     Remove files that are too old
     """
     mintime = time.time() + maxage
-    for f in iter_media():
+    for f in iter_media_dir():
         if f.startswith('.'):
             continue
         if not f.is_file():
@@ -132,7 +132,7 @@ def remove_big(maxsize):
     """
     files = sorted([
         (p, p.stat().st_size)
-        for p in iter_media()
+        for p in iter_media_dir()
     ], key=lambda i: pathtime(i[0]))
     totalsize = sum(s for _, s in files)
     if totalsize > maxsize:
@@ -146,10 +146,11 @@ def remove_big(maxsize):
                 f.unlink()
 
 
-def iter_entries(feeds):
+def iter_media_links(feeds):
     for url in feeds:
         feed = feedparser.parse(url)
-        yield from feed.entries
+        for ent in feed.entries:
+            yield ent['title'], ent['link']
 
 
 def main():
@@ -159,11 +160,11 @@ def main():
 
     # Scan feeds and download new items
     with SeenList() as sl:
-        for ent in iter_entries(mk_feed_urls(config['sub'])):
+        for title, url in iter_media_links(mk_feed_urls(config['sub'])):
             try:
-                with sl.handle_url(ent.link) as has_seen:
+                with sl.handle_url(url) as has_seen:
                     if not has_seen:
-                        print(f"Downloading {ent['title']} ({ent['link']})", file=sys.stderr)
+                        print(f"Downloading {title} ({url})", file=sys.stderr)
                         # XXX: How do direct and non-service links work?
                         subprocess.run(
                             [
@@ -172,12 +173,12 @@ def main():
                                 '--extract-audio', '--audio-quality', '0',
                                 # TODO: Pass maxage args
                                 '--quiet',
-                                ent.link,
+                                url,
                             ],
                             check=True,
                         )
             except subprocess.CalledProcessError:
-                print(f"Error downloading {ent['title']} ({ent['link']})", file=sys.stderr)
+                print(f"Error downloading {title} ({url})", file=sys.stderr)
 
     # Now apply limits
     # First, delete everything too old
