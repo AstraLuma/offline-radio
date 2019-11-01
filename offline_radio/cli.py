@@ -4,6 +4,7 @@ from pathlib import Path
 import subprocess
 import sys
 import time
+import xattr
 
 
 def mk_feed_urls(subs):
@@ -55,25 +56,36 @@ class SeenList:
     def __enter__(self):
         try:
             with open('.offline-radio.state', 'rt') as f:
-                self._urls = {
+                self._urls = [
                     l.strip()
                     for l in f
-                }
+                ]
         except FileNotFoundError:
             self._urls = set()
+
+        # Attempt to load from xattrs
+        # We can't rely on this, but there's gaps in the other algorithms
+        for p in iter_media():
+            try:
+                u = xattr.getxattr(str(p), "user.xdg.referrer.url")
+            except OSError:
+                pass
+            else:
+                if u not in self._urls:
+                    self._urls.append(u)
 
         self._seen = set()
 
         return self
 
     def __exit__(self, type, value, traceback):
-        # On error exit, don't prune
-        if value:
-            seq = self._urls + self._seen
-        else:
-            seq = self._seen
         with open('.offline-radio.state', 'wt') as f:
-            for u in seq:
+            # Only write the last 1000, as a pruning meassure
+            # XXX: This will cause problems if there's enough feeds to have
+            # 1000 active
+            for u in self._urls[-1000:]:
+                print(u, file=f)
+            for u in self._seen:
                 print(u, file=f)
 
     def has_seen(self, url):
@@ -121,7 +133,7 @@ def remove_big(maxsize):
     if totalsize > maxsize:
         keep = {
             p
-            for p, _ in iter_until_total(files, maxsize)
+            for p, _ in iter_until_total(reversed(files), maxsize)
         }
         for f, _ in files:
             if f not in keep:
@@ -147,6 +159,7 @@ def main():
                             'youtube-dl', '--add-metadata', '--xattrs',
                             '--match-filter', '!is_live',
                             '--extract-audio', '--audio-quality', '0',
+                            # TODO: Pass maxage args
                             '--quiet',
                             ent.link,
                         ],
