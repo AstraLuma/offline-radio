@@ -33,7 +33,7 @@ def pathtime(p):
 
 def iter_media():
     for f in Path().iterdir():
-        if f.startswith('.'):
+        if f.name.startswith('.'):
             continue
         if not f.is_file():
             continue
