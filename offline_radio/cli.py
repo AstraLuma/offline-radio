@@ -1,9 +1,11 @@
-import toml
-import feedparser
+from contextlib import contextmanager
 from pathlib import Path
 import subprocess
 import sys
 import time
+
+import feedparser
+import toml
 import xattr
 
 
@@ -67,7 +69,7 @@ class SeenList:
         # We can't rely on this, but there's gaps in the other algorithms
         for p in iter_media():
             try:
-                u = xattr.getxattr(str(p), "user.xdg.referrer.url")
+                u = xattr.getxattr(str(p), "user.xdg.referrer.url").decode('utf-8')
             except OSError:
                 pass
             else:
@@ -88,11 +90,14 @@ class SeenList:
             for u in self._seen:
                 print(u, file=f)
 
-    def has_seen(self, url):
-        return url in self._urls or url in self._seen
-
-    def add(self, url):
-        self._seen.add(url)
+    @contextmanager
+    def handle_url(self, url):
+        try:
+            yield url in self._urls or url in self._seen
+        except Exception:
+            raise
+        else:
+            self._seen.add(url)
 
 
 def remove_old(maxage):
@@ -141,6 +146,12 @@ def remove_big(maxsize):
                 f.unlink()
 
 
+def iter_entries(feeds):
+    for url in feeds:
+        feed = feedparser.parse(url)
+        yield from feed.entries
+
+
 def main():
     # Load config
     with open('.offline-radio.toml', 'rt') as cf:
@@ -148,26 +159,25 @@ def main():
 
     # Scan feeds and download new items
     with SeenList() as sl:
-        for url in mk_feed_urls(config['sub']):
-            feed = feedparser.parse(url)
-            for ent in feed.entries:
-                if not sl.has_seen(ent.link):
-                    print(f"Downloading {ent['title']} ({ent['link']})", file=sys.stderr)
-                    # XXX: How do direct and non-service links work?
-                    proc = subprocess.run(
-                        [
-                            'youtube-dl', '--add-metadata', '--xattrs',
-                            '--match-filter', '!is_live',
-                            '--extract-audio', '--audio-quality', '0',
-                            # TODO: Pass maxage args
-                            '--quiet',
-                            ent.link,
-                        ],
-                    )
-                    if proc.returncode:
-                        print(f"Error downloading {ent['title']} ({ent['link']})", file=sys.stderr)
-                    else:
-                        sl.add(ent.link)
+        for ent in iter_entries(mk_feed_urls(config['sub'])):
+            try:
+                with sl.handle_url(ent.link) as has_seen:
+                    if not has_seen:
+                        print(f"Downloading {ent['title']} ({ent['link']})", file=sys.stderr)
+                        # XXX: How do direct and non-service links work?
+                        subprocess.run(
+                            [
+                                'youtube-dl', '--add-metadata', '--xattrs',
+                                '--match-filter', '!is_live',
+                                '--extract-audio', '--audio-quality', '0',
+                                # TODO: Pass maxage args
+                                '--quiet',
+                                ent.link,
+                            ],
+                            check=True,
+                        )
+            except subprocess.CalledProcessError:
+                print(f"Error downloading {ent['title']} ({ent['link']})", file=sys.stderr)
 
     # Now apply limits
     # First, delete everything too old
