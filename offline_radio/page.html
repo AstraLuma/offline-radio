@@ -3,16 +3,51 @@
   <head>
     <meta charset="utf-8">
     <title>Radio</title>
-    <!--link rel="stylesheet" href="style.css"-->
+    <style>
+      body {
+        display: grid;
+        margin: 0.5rem;
+        width: calc(100vw - 1rem);
+        height: calc(100vh - 1rem);
+        grid-template-columns: auto;
+        grid-template-rows: 2rem 2rem 2rem auto;
+        grid-template-areas: 
+          "title"
+          "player"
+          "buttons"
+          "desc"
+      }
+      #title {
+        grid-area: title;
+        white-space: nowrap;
+        overflow: hidden;
+        font-size: 1.5rem;
+        margin-top: 0rem;
+        margin-bottom: 0rem;
+      }
+      #player {
+        grid-area: player;
+        display: block;
+        width: 100%;
+        height: 2rem;
+      }
+      #button-bar {
+        grid-area: buttons;
+      }
+      #desc {
+        grid-area: desc;
+        overflow: scroll;
+        white-space: pre;
+      }
+    </style>
   </head>
   <body>
     <h1 id="title"></h1>
-    <div>
-      <audio id="player" controls autoplay></audio>
-    </div>
-    <div>
+    <audio id="player" controls autoplay></audio>
+    <div id="button-bar">
       <button id="next">Next</button>
     </div>
+    <div id="desc"></div>
     <script>
 function pyready() {
   return new Promise(function(resolve, reject) {
@@ -34,6 +69,7 @@ Promise.all([
   domready().then(() => ({
     player: document.getElementById('player'),
     title: document.getElementById('title'),
+    desc: document.getElementById('desc'),
     next: document.getElementById('next'),
   }))
 ]).then((data) => {
@@ -42,9 +78,10 @@ Promise.all([
 
   function next_track() {
     var next = tracks[Math.floor(Math.random() * tracks.length)];
-    console.log("Playing", next);
-    elems.title.innerText = next.title;
+    console.log("Loading", next);
     pywebview.api.read_track_contents(next.filename).then((url) => {
+      elems.title.innerText = next.title;
+      elems.desc.innerText = next.desc;
       elems.player.src = url;
     });
   }

@@ -48,9 +48,7 @@ class JsApi:
             )
             data = ntf.read()
 
-        url = f"data:{ctype};base64,{base64.b64encode(data).decode('ascii')}"
-        print(f"Made url {len(url)}")
-        return url
+        return f"data:{ctype};base64,{base64.b64encode(data).decode('ascii')}"
 
 
 def start():
