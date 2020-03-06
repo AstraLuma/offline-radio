@@ -72,14 +72,12 @@ Promise.all([
 ]).then((data) => {
   var elems = data[1];
 
-  function next_track() {
-    pywebview.api.get_next_track().then((next) => {
-      pywebview.api.read_track_contents(next.filename).then((url) => {
-        elems.title.innerText = next.title;
-        elems.desc.innerText = next.desc;
-        elems.player.src = url;
-      });
-    });
+  async function next_track() {
+    var next = await pywebview.api.get_next_track();
+    var url = await pywebview.api.read_track_contents(next.filename);
+    elems.title.innerText = next.title;
+    elems.desc.innerText = next.desc;
+    elems.player.src = url;
   }
 
   elems.player.addEventListener('ended', next_track);
