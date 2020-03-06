@@ -62,10 +62,7 @@ function domready() {
 }
 
 Promise.all([
-  pyready().then(() => {
-    console.log("API ready");
-    return pywebview.api.read_track_data();
-  }),
+  pyready(),
   domready().then(() => ({
     player: document.getElementById('player'),
     title: document.getElementById('title'),
@@ -73,16 +70,15 @@ Promise.all([
     next: document.getElementById('next'),
   }))
 ]).then((data) => {
-  var tracks = data[0];
   var elems = data[1];
 
   function next_track() {
-    var next = tracks[Math.floor(Math.random() * tracks.length)];
-    console.log("Loading", next);
-    pywebview.api.read_track_contents(next.filename).then((url) => {
-      elems.title.innerText = next.title;
-      elems.desc.innerText = next.desc;
-      elems.player.src = url;
+    pywebview.api.get_next_track().then((next) => {
+      pywebview.api.read_track_contents(next.filename).then((url) => {
+        elems.title.innerText = next.title;
+        elems.desc.innerText = next.desc;
+        elems.player.src = url;
+      });
     });
   }
 
