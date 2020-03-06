@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Radio</title>
+    <!--link rel="stylesheet" href="style.css"-->
+  </head>
+  <body>
+    <h1 id="title"></h1>
+    <div>
+      <audio id="player" controls autoplay></audio>
+    </div>
+    <div>
+      <button id="next">Next</button>
+    </div>
+    <script>
+function pyready() {
+  return new Promise(function(resolve, reject) {
+    window.addEventListener("pywebviewready", resolve);
+  });
+}
+
+function domready() {
+  return new Promise(function(resolve, reject) {
+    document.addEventListener("DOMContentLoaded", resolve);
+  });
+}
+
+Promise.all([
+  pyready().then(() => {
+    console.log("API ready");
+    return pywebview.api.read_track_data();
+  }),
+  domready().then(() => ({
+    player: document.getElementById('player'),
+    title: document.getElementById('title'),
+    next: document.getElementById('next'),
+  }))
+]).then((data) => {
+  var tracks = data[0];
+  var elems = data[1];
+
+  function next_track() {
+    var next = tracks[Math.floor(Math.random() * tracks.length)];
+    console.log("Playing", next);
+    elems.title.innerText = next.title;
+    pywebview.api.read_track_contents(next.filename).then((url) => {
+      elems.player.src = url;
+    });
+  }
+
+  elems.player.addEventListener('ended', next_track);
+  elems.next.addEventListener('click', next_track);
+
+  next_track();
+});
+    </script>
+  </body>
+</html>

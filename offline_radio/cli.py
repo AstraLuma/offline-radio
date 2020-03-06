@@ -130,6 +130,7 @@ def remove_big(maxsize):
     """
     Remove files until we're under the max size, oldest first
     """
+    # This will be oldest first
     files = sorted([
         (p, p.stat().st_size)
         for p in iter_media_dir()
@@ -138,6 +139,7 @@ def remove_big(maxsize):
     if totalsize > maxsize:
         keep = {
             p
+            # Reverse to go newest->oldest, so we ultimately remove the oldest
             for p, _ in iter_until_total(reversed(files), maxsize)
         }
         for f, _ in files:
