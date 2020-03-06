@@ -15,14 +15,15 @@ from .cli import main as run_downloader
 
 
 class JsApi:
-    def get_next_track(self):
-        file = random.choice([
+    def _select_next_track(self):
+        return random.choice([
             file
             for file in os.listdir()
             if not file.startswith('.') and os.path.isfile(file)
         ])
 
-        x = xattr.xattr(file)
+    def _build_metadata(self, filename):
+        x = xattr.xattr(filename)
 
         def g(name):
             try:
@@ -31,11 +32,15 @@ class JsApi:
                 pass
 
         return {
-            'filename': file,
+            'filename': filename,
             'title': g('user.dublincore.title'),
             'channel': g('user.dublincore.contributor'),
             'desc': g('user.dublincore.description'),
         }
+
+    def get_next_track(self):
+        file = self._select_next_track()
+        return self._build_metadata(file)
 
     def read_track_contents(self, filename):
         """
@@ -53,6 +58,51 @@ class JsApi:
             ctype = mimetypes.guess_type(ntf.name)[0] or 'application/octet-stream'
 
         return f"data:{ctype};base64,{base64.b64encode(data).decode('ascii')}"
+
+    _process = None
+    _buffer = None
+
+    def track_open(self):
+        """
+        Opens the next track.
+
+        Returns the metadata
+        """
+        # Clean up any existing stuff
+        if self._process is not None:
+            self._process.terminate()
+            self._process = None
+
+        if self._buffer is not None:
+            self._buffer.close()
+            self._buffer = None
+
+        filename = self._select_next_track()
+        metadata = self._build_metadata(filename)
+
+        metadata['mimetype'] = 'audio/mpeg'
+
+        # TODO: Stream
+        self._buffer = tempfile.NamedTemporaryFile(suffix='.mp3')
+        self._process = subprocess.run(
+            ['ffmpeg', '-y', '-loglevel', 'warning', '-i', filename, self._buffer.name],
+            check=True, stdin=subprocess.DEVNULL,
+        )
+
+        return metadata
+
+    def track_read(self, amount):
+        """
+        Reads up to amount of data from the track and returns it. May return less.
+
+        Data is base64 encoded.
+
+        Returns {"eof": true} when finished.
+        """
+        data = self._buffer.read(amount)
+        if not data:  # FIXME: Handle blocking vs non-blocking
+            return {'eof': True}
+        return base64.b64encode(data).decode('ascii')
 
 
 def scanner_thread():

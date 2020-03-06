@@ -49,6 +49,16 @@
     </div>
     <div id="desc"></div>
     <script>
+function base64_to_buffer(base64) {
+    var binary_string = window.atob(base64);
+    var len = binary_string.length;
+    var bytes = new Uint8Array(len);
+    for (var i = 0; i < len; i++) {
+        bytes[i] = binary_string.charCodeAt(i);
+    }
+    return bytes.buffer;
+}
+
 function pyready() {
   return new Promise(function(resolve, reject) {
     window.addEventListener("pywebviewready", resolve);
@@ -73,11 +83,34 @@ Promise.all([
   var elems = data[1];
 
   async function next_track() {
-    var next = await pywebview.api.get_next_track();
-    var url = await pywebview.api.read_track_contents(next.filename);
-    elems.title.innerText = next.title;
-    elems.desc.innerText = next.desc;
-    elems.player.src = url;
+    var meta = await pywebview.api.track_open();
+    elems.title.innerText = meta.title;
+    elems.desc.innerText = meta.desc;
+
+    console.log("Starting to load", meta.title);
+
+    var source = new MediaSource;
+
+    // source.addEventListener('sourceopen', async () => {
+
+    // });
+
+    elems.player.src = URL.createObjectURL(source);
+
+    var buffer = source.addSourceBuffer(meta.mimetype);
+
+    console.log("Things configured; reading data");
+
+    while (true) {
+      resp = await pywebview.api.track_open(4 * 1024);
+      console.log("Got chunk")
+      if (resp.eof) {
+        console.log("Got EOF")
+        break;
+      }
+      data = base64_to_buffer(resp);
+      buffer.appendBuffer(data);
+    }
   }
 
   elems.player.addEventListener('ended', next_track);
