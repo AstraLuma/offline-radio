@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Radio</title>
+    <style>
+      body {
+        display: grid;
+        margin: 0.5rem;
+        width: calc(100vw - 1rem);
+        height: calc(100vh - 1rem);
+        grid-template-columns: auto;
+        grid-template-rows: 2rem 2rem 2rem auto;
+        grid-template-areas: 
+          "title"
+          "player"
+          "buttons"
+          "desc"
+      }
+      #title {
+        grid-area: title;
+        white-space: nowrap;
+        overflow: hidden;
+        font-size: 1.5rem;
+        margin-top: 0rem;
+        margin-bottom: 0rem;
+      }
+      #player {
+        grid-area: player;
+        display: block;
+        width: 100%;
+        height: 2rem;
+      }
+      #button-bar {
+        grid-area: buttons;
+      }
+      #desc {
+        grid-area: desc;
+        overflow: scroll;
+        white-space: pre;
+      }
+    </style>
+  </head>
+  <body>
+    <h1 id="title"></h1>
+    <audio id="player" controls autoplay></audio>
+    <div id="button-bar">
+      <button id="next">Next</button>
+    </div>
+    <div id="desc"></div>
+    <script>
+function pyready() {
+  return new Promise(function(resolve, reject) {
+    window.addEventListener("pywebviewready", resolve);
+  });
+}
+
+function domready() {
+  return new Promise(function(resolve, reject) {
+    document.addEventListener("DOMContentLoaded", resolve);
+  });
+}
+
+domready()
+.then(() => ({
+  player: document.getElementById('player'),
+  title: document.getElementById('title'),
+  desc: document.getElementById('desc'),
+  next: document.getElementById('next'),
+}))
+.then((elems) => {
+
+  async function next_track() {
+    console.log("Advancing...")
+    var resp = await fetch('/api/next', {
+      'mode': 'same-origin',
+      'cache': 'no-store',
+    });
+    if (!resp.ok) {
+      console.error("Failed request", resp);
+      return;
+    }
+    var next = await resp.json();
+    elems.title.innerText = next.title;
+    elems.desc.innerText = next.desc;
+    elems.player.src = next.filename;
+  }
+
+  elems.player.addEventListener('ended', next_track);
+  elems.next.addEventListener('click', next_track);
+
+  elems.player.addEventListener('canplay', (event) => console.log('canplay', event));
+  elems.player.addEventListener('canplaythrough', (event) => console.log('canplaythrough', event));
+  elems.player.addEventListener('complete', (event) => console.log('complete', event));
+  elems.player.addEventListener('durationchange', (event) => console.log('durationchange', event));
+  elems.player.addEventListener('emptied', (event) => console.log('emptied', event));
+  elems.player.addEventListener('ended', (event) => console.log('ended', event));
+  elems.player.addEventListener('loadeddata', (event) => console.log('loadeddata', event));
+  elems.player.addEventListener('loadedmetadata', (event) => console.log('loadedmetadata', event));
+  elems.player.addEventListener('pause', (event) => console.log('pause', event));
+  elems.player.addEventListener('play', (event) => console.log('play', event));
+  elems.player.addEventListener('ratechange', (event) => console.log('ratechange', event));
+  elems.player.addEventListener('seeked', (event) => console.log('seeked', event));
+  elems.player.addEventListener('seeking', (event) => console.log('seeking', event));
+  elems.player.addEventListener('stalled', (event) => console.log('stalled', event));
+  elems.player.addEventListener('suspend', (event) => console.log('suspend', event));
+  // elems.player.addEventListener('timeupdate', (event) => console.log('timeupdate', event));
+  elems.player.addEventListener('volumechange', (event) => console.log('volumechange', event));
+  elems.player.addEventListener('waiting', (event) => console.log('waiting', event));
+  
+  next_track();
+});
+    </script>
+  </body>
+</html>

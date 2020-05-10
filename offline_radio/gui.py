@@ -1,58 +1,44 @@
-import base64
-import importlib.resources
-import mimetypes
+import logging
 import os
 import random
-import subprocess
-import tempfile
 import threading
+import urllib.parse
 
+import flask
 import pause
 import webview
 import xattr
 
 from .cli import main as run_downloader
 
+api = flask.Flask(__name__)
 
-class JsApi:
-    def get_next_track(self):
-        file = random.choice([
-            file
-            for file in os.listdir()
-            if not file.startswith('.') and os.path.isfile(file)
-        ])
 
-        x = xattr.xattr(file)
+@api.route('/next')
+def get_next_track():
+    file = random.choice([
+        file
+        for file in os.listdir()
+        if not file.startswith('.') and os.path.isfile(file)
+    ])
 
-        def g(name):
-            try:
-                return x.get(name).decode('utf-8')
-            except (OSError, IOError):
-                pass
+    x = xattr.xattr(file)
 
-        return {
-            'filename': file,
-            'title': g('user.dublincore.title'),
-            'channel': g('user.dublincore.contributor'),
-            'desc': g('user.dublincore.description'),
-        }
+    def g(name):
+        try:
+            return x.get(name).decode('utf-8')
+        except (OSError, IOError):
+            pass
 
-    def read_track_contents(self, filename):
-        """
-        Returns track data as a data URL
-        """
-        if '/' in filename:
-            raise ValueError("Other directories not allowed")
-
-        with tempfile.NamedTemporaryFile(suffix='.mp3') as ntf:
-            subprocess.run(
-                ['ffmpeg', '-y', '-loglevel', 'warning', '-i', filename, ntf.name],
-                check=True, stdin=subprocess.DEVNULL,
-            )
-            data = ntf.read()
-            ctype = mimetypes.guess_type(ntf.name)[0] or 'application/octet-stream'
-
-        return f"data:{ctype};base64,{base64.b64encode(data).decode('ascii')}"
+    return flask.jsonify({
+        'filename': urllib.parse.urljoin(
+            flask.request.base_url,
+            f"/media/{file}"
+        ),
+        'title': g('user.dublincore.title'),
+        'channel': g('user.dublincore.contributor'),
+        'desc': g('user.dublincore.description'),
+    })
 
 
 def scanner_thread():
@@ -62,15 +48,24 @@ def scanner_thread():
 
 
 def start():
-    threading.Thread(target=scanner_thread, daemon=True).start()
+    # threading.Thread(target=scanner_thread, daemon=True).start()
+
+    from whitenoise import WhiteNoise
+    from webview.wsgi import do_404
+    table = webview.Routing({
+        '/': webview.StaticResources('offline_radio.static'),
+        '/api': api,
+        '/media': webview.StaticFiles(os.getcwd()),
+        # '/media': WhiteNoise(do_404, root=os.getcwd()),
+    })
     webview.create_window(
         'Radio',
-        html=importlib.resources.read_text('offline_radio', 'page.html'),
-        js_api=JsApi(),
+        table,
         width=500, height=200,
     )
     webview.start(debug=True)
 
 
 if __name__ == '__main__':
+    logging.basicConfig(level='DEBUG')
     start()
