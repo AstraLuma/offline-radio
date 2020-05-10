@@ -48,15 +48,12 @@ def scanner_thread():
 
 
 def start():
-    # threading.Thread(target=scanner_thread, daemon=True).start()
+    threading.Thread(target=scanner_thread, daemon=True).start()
 
-    from whitenoise import WhiteNoise
-    from webview.wsgi import do_404
     table = webview.Routing({
         '/': webview.StaticResources('offline_radio.static'),
         '/api': api,
         '/media': webview.StaticFiles(os.getcwd()),
-        # '/media': WhiteNoise(do_404, root=os.getcwd()),
     })
     webview.create_window(
         'Radio',
