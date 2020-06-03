@@ -35,7 +35,7 @@ def get_next_track():
             flask.request.base_url,
             f"/media/{file}"
         ),
-        'title': g('user.dublincore.title'),
+        'title': g('user.dublincore.title') or file,
         'channel': g('user.dublincore.contributor'),
         'desc': g('user.dublincore.description'),
     })
@@ -64,5 +64,5 @@ def start():
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level='DEBUG')
+    logging.basicConfig(level='INFO')
     start()
